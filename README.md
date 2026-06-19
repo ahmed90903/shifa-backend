@@ -1,3 +1,12 @@
+---
+title: Shifa Backend
+emoji: 🏆
+colorFrom: red
+colorTo: blue
+sdk: docker
+pinned: false
+---
+
 # Smart Physical Therapy System
 
 AI-powered web application for home-based physical rehabilitation.  
