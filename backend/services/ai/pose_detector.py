@@ -82,10 +82,7 @@ class PoseDetector:
         min_tracking_confidence: float = 0.6,
         model_complexity: int = 1,
     ):
-        self.cap = cv2.VideoCapture(camera_index)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.cap = None
 
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(
