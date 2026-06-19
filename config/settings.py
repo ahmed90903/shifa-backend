@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./smart_pt.db"
 
     # Accept a JSON string like '["http://localhost:3000"]' or a plain list
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000", "http://localhost:5173", "http://localhost:8080"]
+    CORS_ORIGINS: List[str] = ["*"]
 
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
