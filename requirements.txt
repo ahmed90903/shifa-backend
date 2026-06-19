@@ -1,0 +1,31 @@
+# ─── Web Framework ────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart
+
+# ─── Computer Vision & AI ─────────────────────────────────────────────────────
+mediapipe
+opencv-python-headless
+numpy
+
+# ─── Database ─────────────────────────────────────────────────────────────────
+sqlalchemy
+alembic
+aiosqlite
+
+# ─── Auth & Security ──────────────────────────────────────────────────────────
+python-jose[cryptography]
+passlib[bcrypt]
+
+# ─── WebSocket / Real-time ────────────────────────────────────────────────────
+websockets
+
+# ─── Data Validation ──────────────────────────────────────────────────────────
+pydantic
+pydantic-settings
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+python-dotenv
+aiofiles
+Pillow
+pyttsx3
