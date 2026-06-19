@@ -287,3 +287,17 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
     await db.commit()
     
     return {"message": "Password updated successfully"}
+
+@router.get("/debug-smtp")
+async def debug_smtp():
+    from config.settings import settings
+    import smtplib
+    if not settings.SMTP_EMAIL or not settings.SMTP_PASSWORD:
+        return {"status": "error", "message": "SMTP_EMAIL or SMTP_PASSWORD is not set"}
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+        return {"status": "success", "message": f"Successfully connected to SMTP as {settings.SMTP_EMAIL}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
