@@ -25,10 +25,12 @@ def send_email_sync(to_email: str, subject: str, body: str):
     msg["To"] = to_email
 
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5) as server:
             server.starttls()
             server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
             server.send_message(msg)
+    except TimeoutError:
+        print(f"Timeout connecting to SMTP server {settings.SMTP_HOST}")
     except Exception as e:
         print(f"Failed to send email to {to_email}: {e}")
         # In a real app we might raise or handle it
