@@ -23,6 +23,7 @@ websockets
 # ─── Data Validation ──────────────────────────────────────────────────────────
 pydantic
 pydantic-settings
+email-validator
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
 python-dotenv
