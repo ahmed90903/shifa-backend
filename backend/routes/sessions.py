@@ -6,6 +6,7 @@ GET   /api/sessions/history         – last 20 sessions
 WS    /api/sessions/ws/{key}        – live AI analysis (JWT via ?token=)
 """
 import json
+import asyncio
 from datetime import datetime
 from typing import List
 
@@ -197,18 +198,24 @@ async def ws_pose(
                 if rep_count != last_rep_count or feedback_message != last_feedback or frame_count % 20 == 0:
                     last_rep_count = rep_count
                     last_feedback = feedback_message
-                    try:
-                        log = AIAnalysisLog(
-                            session_id=session_id,
-                            joint_angle=result.get("joint_angle"),
-                            is_correct_form=result.get("is_correct_form", False),
-                            feedback_message=feedback_message,
-                            rep_count=rep_count,
-                        )
-                        db.add(log)
-                        await db.commit()
-                    except Exception:
-                        await db.rollback()
+                    
+                    async def save_log(data: dict):
+                        async with AsyncSessionLocal() as bg_db:
+                            try:
+                                log = AIAnalysisLog(**data)
+                                bg_db.add(log)
+                                await bg_db.commit()
+                            except Exception:
+                                await bg_db.rollback()
+                                
+                    log_data = dict(
+                        session_id=session_id,
+                        joint_angle=result.get("joint_angle"),
+                        is_correct_form=result.get("is_correct_form", False),
+                        feedback_message=feedback_message,
+                        rep_count=rep_count,
+                    )
+                    asyncio.create_task(save_log(log_data))
 
     except WebSocketDisconnect:
         pass

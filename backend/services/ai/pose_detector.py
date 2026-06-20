@@ -80,7 +80,7 @@ class PoseDetector:
         camera_index: int = 0,
         min_detection_confidence: float = 0.6,
         min_tracking_confidence: float = 0.6,
-        model_complexity: int = 1,
+        model_complexity: int = 0,
     ):
         self.cap = None
 
