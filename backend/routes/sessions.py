@@ -175,6 +175,10 @@ async def ws_pose(
 
         # Main analysis loop
         async with AsyncSessionLocal() as db:
+            last_rep_count = -1
+            last_feedback = ""
+            frame_count = 0
+            
             while True:
                 try:
                     data = await websocket.receive_json()
@@ -185,19 +189,26 @@ async def ws_pose(
                 result = analyzer.analyze(frame_b64)
                 await websocket.send_json(result)
 
-                # Persist AI log (non-blocking; errors silently ignored)
-                try:
-                    log = AIAnalysisLog(
-                        session_id=session_id,
-                        joint_angle=result.get("joint_angle"),
-                        is_correct_form=result.get("is_correct_form", False),
-                        feedback_message=result.get("feedback_message", ""),
-                        rep_count=result.get("rep_count", 0),
-                    )
-                    db.add(log)
-                    await db.commit()
-                except Exception:
-                    await db.rollback()
+                rep_count = result.get("rep_count", 0)
+                feedback_message = result.get("feedback_message", "")
+                frame_count += 1
+
+                # Persist AI log on significant changes or every 20 frames to avoid high latency
+                if rep_count != last_rep_count or feedback_message != last_feedback or frame_count % 20 == 0:
+                    last_rep_count = rep_count
+                    last_feedback = feedback_message
+                    try:
+                        log = AIAnalysisLog(
+                            session_id=session_id,
+                            joint_angle=result.get("joint_angle"),
+                            is_correct_form=result.get("is_correct_form", False),
+                            feedback_message=feedback_message,
+                            rep_count=rep_count,
+                        )
+                        db.add(log)
+                        await db.commit()
+                    except Exception:
+                        await db.rollback()
 
     except WebSocketDisconnect:
         pass

@@ -201,35 +201,39 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
     user_result = await db.execute(select(User).where(User.email == body.email))
     user = user_result.scalar_one_or_none()
     
-    if user:
-        otp = generate_otp()
-        otp_hash = hash_password(otp)
-        expire_time = datetime.now(timezone.utc) + timedelta(minutes=10)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if getattr(user, 'is_verified', False) == False:
+        raise HTTPException(status_code=403, detail="Please verify your email before resetting your password")
+
+    otp = generate_otp()
+    otp_hash = hash_password(otp)
+    expire_time = datetime.now(timezone.utc) + timedelta(minutes=10)
+    
+    # Invalidate previous unused resets
+    await db.execute(
+        PasswordReset.__table__.update()
+        .where((PasswordReset.email == body.email) & (PasswordReset.is_used == False))
+        .values(is_used=True)
+    )
+    
+    reset_record = PasswordReset(
+        user_id=user.id,
+        email=user.email,
+        reset_code=otp_hash,
+        expires_at=expire_time.replace(tzinfo=None)
+    )
+    db.add(reset_record)
+    await db.commit()
+    
+    # Send email
+    subject = "Password Reset Verification"
+    body_text = f"Your password reset verification code is: {otp}"
+    from backend.services.email_service import send_email_sync
+    import asyncio
+    await asyncio.to_thread(send_email_sync, user.email, subject, body_text)
         
-        # Invalidate previous unused resets
-        await db.execute(
-            PasswordReset.__table__.update()
-            .where((PasswordReset.email == body.email) & (PasswordReset.is_used == False))
-            .values(is_used=True)
-        )
-        
-        reset_record = PasswordReset(
-            user_id=user.id,
-            email=user.email,
-            reset_code=otp_hash,
-            expires_at=expire_time.replace(tzinfo=None)
-        )
-        db.add(reset_record)
-        await db.commit()
-        
-        # Send email
-        subject = "Password Reset Verification"
-        body_text = f"Your password reset verification code is: {otp}"
-        from backend.services.email_service import send_email_sync
-        import asyncio
-        await asyncio.to_thread(send_email_sync, user.email, subject, body_text)
-        
-    return {"message": "If this email exists, a verification code has been sent."}
+    return {"message": "Verification code has been sent."}
 
 
 @router.post("/verify-reset-code")
