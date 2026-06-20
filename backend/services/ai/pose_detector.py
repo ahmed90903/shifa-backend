@@ -95,8 +95,8 @@ class PoseDetector:
         )
         self.mp_draw = mp.solutions.drawing_utils
 
-        self._frame_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self._frame_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self._frame_w = 640  # Default width for websocket frames
+        self._frame_h = 480  # Default height for websocket frames
 
     # ------------------------------------------------------------------
     # Public API
@@ -209,7 +209,8 @@ class PoseDetector:
         return self._frame_w, self._frame_h
 
     def release(self):
-        self.cap.release()
+        if self.cap is not None:
+            self.cap.release()
         self.pose.close()
 
     # ------------------------------------------------------------------
