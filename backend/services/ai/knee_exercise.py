@@ -87,6 +87,7 @@ class RepRecord:
     is_correct:      bool
     issues:          List[str] = field(default_factory=list)
     duration:        float = 0.0          # seconds
+    score:           float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -112,10 +113,10 @@ class KneeSessionMetrics:
         return end - self.session_start
 
     def update_accuracy(self):
-        if self.total_reps > 0:
-            self.accuracy = (self.correct_reps / self.total_reps) * 100.0
+        if self.rep_records:
+            self.accuracy = sum(r.score for r in self.rep_records) / len(self.rep_records)
         else:
-            self.accuracy = 0.0
+            self.accuracy = self.current_accuracy
             
         if self.angle_samples:
             self.avg_angle = float(np.mean(self.angle_samples))
@@ -148,6 +149,8 @@ class KneeExercise:
         self._peak_flex_angle   = 180.0   # smallest angle seen this rep
         self._hold_counter      = 0
         self._rep_is_valid      = True    # flag for current rep
+        self._form_penalty      = 0.0
+        self._max_progress      = 0.0
 
         # Posture baseline (captured in first few frames of IDLE)
         self._hip_baseline_y: Optional[float] = None
@@ -289,13 +292,11 @@ class KneeExercise:
                 self._rep_is_valid = False
                 self.status       = FeedbackStatus.WARNING
                 self.feedback_msg = issues[0]
-                self.metrics.current_accuracy = max(0.0, self.metrics.current_accuracy - 1.5)
                 if len(self.metrics.angle_samples) % 30 == 1:
                     self.voice_msg = issues[0]
             else:
                 self.status       = FeedbackStatus.CORRECT
                 self.feedback_msg = "Good movement"
-                self.metrics.current_accuracy = min(100.0, self.metrics.current_accuracy + 0.5)
 
             if angle <= self.cfg.FLEX_TARGET_ANGLE:
                 self._hold_counter += 1
@@ -317,6 +318,14 @@ class KneeExercise:
                 self._state = KneeState.EXTENDING
                 self._reset_rep()
 
+        if self._state in (KneeState.BENDING, KneeState.HOLD):
+            if issues:
+                self._form_penalty += 0.5
+            self._max_progress = max(self._max_progress, self.progress)
+            self.metrics.current_accuracy = float(np.clip(self._max_progress * 100.0 - self._form_penalty, 0.0, 100.0))
+        else:
+            self.metrics.current_accuracy = 0.0
+
         if self._state != prev_state:
             logger.debug("Knee state: %s → %s  angle=%.1f",
                          prev_state.name, self._state.name, angle)
@@ -329,6 +338,8 @@ class KneeExercise:
         self._peak_flex_angle = 180.0
         self._hold_counter    = 0
         self._rep_is_valid    = True
+        self._form_penalty    = 0.0
+        self._max_progress    = 0.0
 
     def _complete_rep(self, issues: List[str]):
         is_correct = self._rep_is_valid and len(issues) == 0
@@ -341,6 +352,7 @@ class KneeExercise:
             peak_flex_angle = self._peak_flex_angle,
             is_correct      = is_correct,
             issues          = list(issues),
+            score           = self.metrics.current_accuracy,
         )
         self.metrics.rep_records.append(rec)
 

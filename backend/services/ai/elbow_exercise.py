@@ -52,6 +52,7 @@ class ElbowRepRecord:
     peak_flex_angle: float
     is_correct:      bool
     issues:          List[str] = field(default_factory=list)
+    score:           float = 0.0
 
 # ---------------------------------------------------------------------------
 @dataclass
@@ -73,10 +74,10 @@ class ElbowSessionMetrics:
         return end - self.session_start
 
     def update_accuracy(self):
-        if self.total_reps > 0:
-            self.accuracy = (self.correct_reps / self.total_reps) * 100.0
+        if self.rep_records:
+            self.accuracy = sum(r.score for r in self.rep_records) / len(self.rep_records)
         else:
-            self.accuracy = 0.0
+            self.accuracy = self.current_accuracy
         if self.angle_samples:
             self.avg_angle = float(np.mean(self.angle_samples))
 
@@ -97,6 +98,8 @@ class ElbowExercise:
         self._peak_flex_angle   = 180.0
         self._hold_counter      = 0
         self._rep_is_valid      = True
+        self._form_penalty      = 0.0
+        self._max_progress      = 0.0
 
         self._shoulder_baseline_y: Optional[float] = None
         self._forearm_ref_angle: Optional[float]   = None   # store in degrees now
@@ -220,13 +223,11 @@ class ElbowExercise:
                 self._rep_is_valid = False
                 self.status        = FeedbackStatus.WARNING
                 self.feedback_msg  = issues[0]
-                self.metrics.current_accuracy = max(0.0, self.metrics.current_accuracy - 1.5)
                 if len(self.metrics.angle_samples) % 30 == 1:
                     self.voice_msg = issues[0]
             else:
                 self.status       = FeedbackStatus.CORRECT
                 self.feedback_msg = "Good form"
-                self.metrics.current_accuracy = min(100.0, self.metrics.current_accuracy + 0.5)
 
             if angle > self.cfg.FLEX_TARGET_ANGLE + 25:
                 self.feedback_msg = "Bend your elbow more"
@@ -248,6 +249,14 @@ class ElbowExercise:
                 self._state = ElbowState.EXTENDING
                 self._reset_rep()
 
+        if self._state in (ElbowState.BENDING, ElbowState.HOLD):
+            if issues:
+                self._form_penalty += 0.5
+            self._max_progress = max(self._max_progress, self.progress)
+            self.metrics.current_accuracy = float(np.clip(self._max_progress * 100.0 - self._form_penalty, 0.0, 100.0))
+        else:
+            self.metrics.current_accuracy = 0.0
+
         if self._state != prev:
             logger.debug("Elbow state: %s → %s  angle=%.1f",
                          prev.name, self._state.name, angle)
@@ -257,6 +266,8 @@ class ElbowExercise:
         self._peak_flex_angle = 180.0
         self._hold_counter    = 0
         self._rep_is_valid    = True
+        self._form_penalty    = 0.0
+        self._max_progress    = 0.0
 
     def _complete_rep(self, issues: List[str]):
         is_correct = self._rep_is_valid and len(issues) == 0
@@ -269,6 +280,7 @@ class ElbowExercise:
             peak_flex_angle = self._peak_flex_angle,
             is_correct      = is_correct,
             issues          = list(issues),
+            score           = self.metrics.current_accuracy,
         ))
 
         if is_correct:
